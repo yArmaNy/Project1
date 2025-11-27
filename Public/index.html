@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Group Availability (BetterWhen2Meet-style)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     :root {
       --border-color:#ccc;
@@ -278,8 +279,47 @@
       border-color:#b33;
     }
 
+    /* Mobile tweaks */
     @media (max-width: 700px){
-      header { flex-direction:column; align-items:flex-start; }
+      body {
+        font-size:14px;
+      }
+      header {
+        flex-direction:column;
+        align-items:flex-start;
+        gap:4px;
+        padding:8px 12px;
+      }
+      main {
+        padding:10px;
+      }
+      .card {
+        padding:10px;
+        margin-bottom:12px;
+      }
+      .row {
+        flex-direction:column;
+        gap:10px;
+      }
+      .column {
+        min-width:100%;
+      }
+      #grid-container {
+        max-height:60vh; /* fit better on small screens */
+      }
+      .time-label {
+        font-size:9px;
+      }
+      .date-header {
+        min-width:42px;
+        font-size:10px;
+      }
+      .slot-cell {
+        min-width:42px;
+      }
+      #legend {
+        font-size:10px;
+      }
     }
   </style>
 </head>
@@ -295,8 +335,6 @@
     <h2>Sign In</h2>
     <label for="name-input">Your name</label>
     <input id="name-input" type="text" placeholder="e.g. name">
-
-    
 
     <button id="signin-button">Sign In</button>
     <div id="signin-error" class="small-text" style="color:#c0392b;margin-top:6px;"></div>
@@ -401,12 +439,6 @@
 
 <script>
 (function() {
-  const ADMIN_NAME = 'gam_evo';
-
-  function isAdminUser(name) {
-    return name === ADMIN_NAME;
-  }
-
   function todayISO() {
     const d = new Date();
     return d.toISOString().slice(0, 10);
@@ -418,7 +450,7 @@
     return d.toISOString().slice(0, 10);
   }
 
-  // --- NEW: load/save from/to server instead of localStorage ---
+  // --- load/save from/to server ---
 
   async function loadState() {
     try {
@@ -450,7 +482,7 @@
   let appState = { events: {}, activeEventId: null };
   let currentUser = null;
   let currentEventId = null;
-
+  let currentIsAdmin = false;
 
   // DOM refs
   const signinSection = document.getElementById('signin-section');
@@ -521,23 +553,21 @@
     if (!currentEventId) return null;
     const ev = appState.events[currentEventId] || null;
     if (!ev) return null;
-    if (ev.participants && ev.participants[ADMIN_NAME]) {
-      delete ev.participants[ADMIN_NAME];
-      saveState();
-    }
+    if (!ev.participants) ev.participants = {};
     return ev;
   }
 
   function ensureParticipant(event, name) {
     if (!event.participants) event.participants = {};
-    if (isAdminUser(name)) return null;
+    // Admin is never counted as a participant
+    if (currentIsAdmin) return null;
     if (!event.participants[name]) {
       event.participants[name] = { hours:{} };
     }
     return event.participants[name];
   }
 
-   // SIGN-IN HANDLER (button + Enter key)
+  // SIGN-IN HANDLER (button + Enter key)
   async function handleSignIn() {
     const name = nameInput.value.trim();
     signinError.textContent = '';
@@ -547,19 +577,38 @@
       return;
     }
 
+    // Ask server whether this name is the admin (server keeps the secret)
+    let isAdmin = false;
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      isAdmin = !!data.isAdmin;
+    } catch (err) {
+      console.error('login failed', err);
+      signinError.textContent = 'Sign-in failed. Please try again.';
+      return;
+    }
+
     currentUser = name;
+    currentIsAdmin = isAdmin;
 
     // Load the latest global state from the server before deciding what to show
     appState = await loadState();
 
-    if (isAdminUser(currentUser)) {
-      currentUserLabel.textContent = 'Admin: ' + ADMIN_NAME;
+    if (currentIsAdmin) {
+      currentUserLabel.textContent = 'Admin: ' + currentUser;
       showAdminView();
     } else {
       const activeId = appState.activeEventId;
       if (!activeId || !appState.events[activeId]) {
         signinError.textContent = 'No event created yet.';
         currentUser = null;
+        currentIsAdmin = false;
         return;
       }
       currentEventId = activeId;
@@ -571,7 +620,6 @@
     }
     signinSection.classList.add('hidden');
   }
-
 
   signinBtn.addEventListener('click', handleSignIn);
   nameInput.addEventListener('keydown', e => {
@@ -748,7 +796,6 @@
       return;
     }
     Object.keys(ev.participants)
-      .filter(name => name !== ADMIN_NAME)
       .sort()
       .forEach(name => {
         const li = document.createElement('li');
@@ -842,7 +889,6 @@
     ev.timeStart = minutesToTimeValue(startM);
     ev.timeEnd   = minutesToTimeValue(endM);
     if (!ev.participants) ev.participants = {};
-    if (ev.participants[ADMIN_NAME]) delete ev.participants[ADMIN_NAME];
 
     // Trim participant hours to existing dates
     const dateSet = new Set(dates);
@@ -867,7 +913,6 @@
     if (!ev) return;
     if (!confirm('Reset all participants’ availability for this event?')) return;
     for (const nm in ev.participants) {
-      if (nm === ADMIN_NAME) continue;
       ev.participants[nm].hours = {};
     }
     saveState();
@@ -963,7 +1008,7 @@
     refreshAllCells();
   }
 
-  // NEW: availability with available + unavailable lists
+  // availability with available + unavailable lists
   function getSlotAvailability(iso, label) {
     const ev = getActiveEvent();
     const participants = ev.participants || {};
@@ -972,7 +1017,6 @@
     let total = 0;
 
     for (const nm in participants) {
-      if (nm === ADMIN_NAME) continue;
       total++;
       const p = participants[nm];
       const arr = (p.hours && p.hours[iso]) ? p.hours[iso] : [];
@@ -1108,7 +1152,7 @@
     dateHeaderRow.style.transform = 'translateX(' + (-gridContainer.scrollLeft) + 'px)';
   });
 
-  // init admin controls
+  // init admin controls (for when admin signs in)
   initAdminDateControls();
 })();
 </script>
