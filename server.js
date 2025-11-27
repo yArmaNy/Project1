@@ -11,7 +11,7 @@ const DATA_FILE = path.join(__dirname, 'data.json');
 app.use(express.json());
 
 // Serve your static files (index.html, CSS, JS)
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'Public')));
 
 // Helper to load state from disk
 function readState() {
