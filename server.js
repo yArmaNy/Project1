@@ -1,4 +1,3 @@
-// oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 // server.js
 const express = require('express');
 const fs = require('fs');
@@ -8,9 +7,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data.json');
 
+// Admin name is ONLY known on the server now.
+// You can override this in Render with an environment variable ADMIN_NAME.
+const ADMIN_NAME = process.env.ADMIN_NAME || 'gam_evo';
+
 app.use(express.json());
 
-// Serve your static files (index.html, CSS, JS)
+// Serve your static files (index.html, CSS, JS) from ./Public
 app.use(express.static(path.join(__dirname, 'Public')));
 
 // Helper to load state from disk
@@ -23,6 +26,17 @@ function readState() {
     const data = JSON.parse(raw || '{}');
     if (!data.events) data.events = {};
     if (!('activeEventId' in data)) data.activeEventId = null;
+
+    // Clean up any old admin participant entries (from older frontend versions)
+    if (ADMIN_NAME && data.events) {
+      for (const id of Object.keys(data.events)) {
+        const ev = data.events[id];
+        if (ev && ev.participants && ev.participants[ADMIN_NAME]) {
+          delete ev.participants[ADMIN_NAME];
+        }
+      }
+    }
+
     return data;
   } catch (e) {
     console.error('Error reading state:', e);
@@ -38,6 +52,23 @@ function writeState(state) {
     console.error('Error writing state:', e);
   }
 }
+
+// Simple "login" endpoint: server tells us if this name is the admin.
+// The actual admin name never appears in the HTML/JS.
+app.post('/api/login', (req, res) => {
+  try {
+    const { name } = req.body || {};
+    if (typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+    const trimmed = name.trim();
+    const isAdmin = trimmed === ADMIN_NAME;
+    res.json({ ok: true, isAdmin });
+  } catch (e) {
+    console.error('Error in /api/login:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
 
 // GET current global state
 app.get('/api/state', (req, res) => {
