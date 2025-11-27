@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Group Availability (When2Meet-style)</title>
+  <title>Group Availability (BetterWhen2Meet-style)</title>
   <style>
     :root {
       --border-color:#ccc;
@@ -294,11 +294,9 @@
   <section id="signin-section" class="card">
     <h2>Sign In</h2>
     <label for="name-input">Your name</label>
-    <input id="name-input" type="text" placeholder="e.g. arman or gam_evo">
+    <input id="name-input" type="text" placeholder="e.g. name">
 
-    <div class="small-text" style="margin-top:6px;">
-      Admin account is <code>gam_evo</code>. Any other name is a normal participant.
-    </div>
+    
 
     <button id="signin-button">Sign In</button>
     <div id="signin-error" class="small-text" style="color:#c0392b;margin-top:6px;"></div>
@@ -377,7 +375,6 @@
     <div class="small-text">
       Drag over the grid to mark when you’re available.
       Colour shows how many people are available; hover a cell to see names.
-      The admin account <code>gam_evo</code> is not counted in these totals.
     </div>
 
     <div id="grid-header">
@@ -561,7 +558,7 @@
     } else {
       const activeId = appState.activeEventId;
       if (!activeId || !appState.events[activeId]) {
-        signinError.textContent = 'No event created yet. Ask gam_evo to make one.';
+        signinError.textContent = 'No event created yet.';
         currentUser = null;
         return;
       }
@@ -1098,7 +1095,7 @@
     participantSection.classList.remove('hidden');
     const ev = getActiveEvent();
     if (!ev) {
-      message.textContent = 'No event found. Ask gam_evo to create one.';
+      message.textContent = 'No event found.';
       return;
     }
     eventTitle.textContent = ev.name || 'Event';
