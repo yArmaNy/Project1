@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Group Availability (When2Meet-style)</title>
+  <style>
+    :root {
+      --border-color:#ccc;
+      --green-base:#2e7d32;
+    }
+
+    * { box-sizing:border-box; }
+
+    body {
+      margin:0;
+      font-family:Arial, sans-serif;
+      background:#f4f4f4;
+    }
+
+    header {
+      background:#333;
+      color:#fff;
+      padding:10px 20px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+    }
+
+    header h1 {
+      margin:0;
+      font-size:20px;
+    }
+
+    main { padding:20px; }
+
+    .hidden { display:none; }
+
+    .card {
+      background:#fff;
+      border-radius:6px;
+      padding:15px;
+      box-shadow:0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom:20px;
+    }
+
+    label { display:block; margin:6px 0 2px; }
+
+    input[type="text"],
+    input[type="date"],
+    input[type="time"],
+    input[type="number"] {
+      width:100%;
+      padding:6px 8px;
+      font-size:14px;
+      border-radius:4px;
+      border:1px solid #ccc;
+    }
+
+    button {
+      padding:6px 12px;
+      font-size:14px;
+      border-radius:4px;
+      border:1px solid #444;
+      background:#444;
+      color:#fff;
+      cursor:pointer;
+      margin-top:8px;
+    }
+    button:hover { background:#222; }
+
+    .small-text { font-size:12px; color:#555; }
+
+    .row { display:flex; flex-wrap:wrap; gap:20px; }
+    .column { flex:1; min-width:260px; }
+
+    /* Admin date grid */
+    #admin-date-grid {
+      display:flex;
+      flex-wrap:wrap;
+      gap:4px;
+      margin-top:8px;
+    }
+
+    .admin-date-cell {
+      width:72px;
+      padding:4px;
+      border:1px solid var(--border-color);
+      border-radius:4px;
+      text-align:center;
+      font-size:11px;
+      cursor:pointer;
+      background:#fafafa;
+      user-select:none;
+    }
+    .admin-date-cell span {
+      display:block;
+    }
+    .admin-date-cell .day-name {
+      font-weight:bold;
+    }
+    .admin-date-cell.selected {
+      background:#c8f7c5;
+      border-color:#2e7d32;
+    }
+
+    /* Admin time strip */
+    #admin-time-strip {
+      display:flex;
+      flex-wrap:wrap;
+      gap:2px;
+      margin-top:8px;
+    }
+    .time-slot-admin {
+      flex:0 0 auto;
+      width:20px;
+      height:24px;
+      border:1px solid var(--border-color);
+      background:#fafafa;
+      cursor:pointer;
+    }
+    .time-slot-admin.selected {
+      background:#a5d6a7;
+      border-color:#2e7d32;
+    }
+    #admin-time-legend {
+      display:flex;
+      justify-content:space-between;
+      margin-top:4px;
+      font-size:11px;
+      color:#555;
+    }
+
+    /* Participant grid header */
+    #grid-header {
+      display:flex;
+      align-items:flex-end;
+      margin-bottom:4px;
+      overflow:hidden; /* header itself doesn't scroll */
+    }
+    #grid-header .time-col-header {
+      width:70px;
+      flex:0 0 auto;
+    }
+    #grid-header .date-header-row {
+      display:flex;
+      flex:1;
+      min-width:260px;
+      will-change:transform;
+    }
+    .date-header {
+      flex:1;
+      min-width:60px;
+      text-align:center;
+      font-size:11px;
+      padding:2px 0;
+    }
+    .date-header .date-main {
+      font-weight:bold;
+      display:block;
+    }
+    .date-header .date-sub {
+      color:#555;
+    }
+
+    /* Time index header column */
+    .time-index-header {
+      flex:0 0 auto;
+      min-width:48px;
+      font-size:10px;
+      text-align:right;
+      padding-right:4px;
+      color:#777;
+      background:#f0f0f0;
+      border-left:1px solid #ddd;
+      border-right:1px solid #ddd;
+    }
+
+    /* Participant grid body */
+    #grid-container {
+      border:1px solid var(--border-color);
+      display:flex;
+      overflow:auto;      /* single scrollbar for h+v */
+      max-height:500px;
+      background:#fff;
+    }
+
+    #time-label-column {
+      flex:0 0 auto;
+      width:70px;
+      border-right:1px solid var(--border-color);
+      background:#fafafa;
+    }
+
+    .time-label {
+      height:18px;
+      font-size:10px;
+      line-height:18px;
+      text-align:right;
+      padding-right:4px;
+      border-bottom:1px solid #eee;
+    }
+
+    #slot-grid {
+      flex:1 1 auto;
+      min-width:260px;
+      position:relative;
+    }
+
+    .slot-row {
+      display:flex;
+      height:18px;
+    }
+
+    .slot-cell {
+      flex:1;
+      min-width:60px;
+      border-right:1px solid #eee;
+      border-bottom:1px solid #eee;
+      cursor:pointer;
+      position:relative;
+      background:#ffffff;
+      user-select:none;
+    }
+
+    .slot-cell.you-selected {
+      outline:2px solid #000;
+      outline-offset:-2px;
+    }
+
+    /* Vertical time index within grid */
+    .time-index-cell {
+      flex:0 0 auto;
+      min-width:48px;
+      border-right:1px solid #ddd;
+      border-bottom:1px solid #eee;
+      font-size:10px;
+      text-align:right;
+      padding-right:3px;
+      background:#f8f8f8;
+      color:#555;
+      pointer-events:none; /* non-interactive */
+    }
+
+    /* Legend */
+    #legend {
+      margin-top:8px;
+      font-size:11px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+    }
+    .legend-box {
+      width:40px;
+      height:14px;
+      border:1px solid #ccc;
+      margin-right:4px;
+    }
+
+    /* Admin participant list */
+    #admin-participant-list {
+      list-style:none;
+      padding-left:0;
+    }
+    #admin-participant-list li {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:3px 0;
+      border-bottom:1px solid #eee;
+      font-size:13px;
+    }
+    #admin-participant-list button {
+      margin-top:0;
+      padding:2px 6px;
+      font-size:11px;
+      background:#b33;
+      border-color:#b33;
+    }
+
+    @media (max-width: 700px){
+      header { flex-direction:column; align-items:flex-start; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Group Availability</h1>
+  <div id="current-user-label"></div>
+</header>
+
+<main>
+  <!-- SIGN IN -->
+  <section id="signin-section" class="card">
+    <h2>Sign In</h2>
+    <label for="name-input">Your name</label>
+    <input id="name-input" type="text" placeholder="e.g. arman or gam_evo">
+
+    <div class="small-text" style="margin-top:6px;">
+      Admin account is <code>gam_evo</code>. Any other name is a normal participant.
+    </div>
+
+    <button id="signin-button">Sign In</button>
+    <div id="signin-error" class="small-text" style="color:#c0392b;margin-top:6px;"></div>
+  </section>
+
+  <!-- ADMIN -->
+  <section id="admin-section" class="card hidden">
+    <h2>Admin: Create / Edit Event</h2>
+
+    <label for="event-name-input">Event name</label>
+    <input id="event-name-input" type="text" placeholder="e.g. Study group, Project meeting">
+
+    <h3>Pick date range</h3>
+    <div class="row">
+      <div class="column">
+        <label for="date-range-start">Start date (future)</label>
+        <input id="date-range-start" type="date">
+      </div>
+      <div class="column">
+        <label for="date-range-days">Number of days to show</label>
+        <input id="date-range-days" type="number" min="1" max="120" value="30">
+      </div>
+    </div>
+    <div class="small-text" style="margin-top:4px;">
+      Drag on the mini-calendar below to select dates for the event.
+      Change the start/day count to reach further in the future. Selected
+      dates will be shown to all participants.
+    </div>
+
+    <div id="admin-date-grid"></div>
+
+    <h3>Pick daily time range (15 min)</h3>
+    <div class="small-text">
+      Drag across the strip to set earliest &amp; latest times. The entire span
+      will be available for participants.
+    </div>
+    <div id="admin-time-strip"></div>
+    <div id="admin-time-legend">
+      <span>00:00</span>
+      <span>06:00</span>
+      <span>12:00</span>
+      <span>18:00</span>
+      <span>24:00</span>
+    </div>
+    <div class="row" style="margin-top:6px;">
+      <div class="column">
+        <label for="time-start-input">Start time</label>
+        <input id="time-start-input" type="time" step="900" value="09:00">
+      </div>
+      <div class="column">
+        <label for="time-end-input">End time</label>
+        <input id="time-end-input" type="time" step="900" value="17:00">
+      </div>
+    </div>
+
+    <div class="small-text" style="margin-top:6px;">
+      Start/end always match the earliest/latest selected quarter-hour slots.
+    </div>
+
+    <button id="save-event-button">Save event</button>
+    <button id="reset-availability-button" style="background:#b33;border-color:#b33;margin-left:8px;">
+      Reset everyone’s availability
+    </button>
+    <div id="admin-message" class="small-text" style="margin-top:6px;"></div>
+
+    <h3 style="margin-top:14px;">Participants</h3>
+    <div class="small-text">
+      Remove a participant to completely delete their availability from this event.
+    </div>
+    <ul id="admin-participant-list"></ul>
+  </section>
+
+  <!-- PARTICIPANT GRID -->
+  <section id="participant-section" class="card hidden">
+    <h2 id="event-title"></h2>
+    <div class="small-text">
+      Drag over the grid to mark when you’re available.
+      Colour shows how many people are available; hover a cell to see names.
+      The admin account <code>gam_evo</code> is not counted in these totals.
+    </div>
+
+    <div id="grid-header">
+      <div class="time-col-header"></div>
+      <div class="date-header-row" id="date-header-row"></div>
+    </div>
+
+    <div id="grid-container">
+      <div id="time-label-column"></div>
+      <div id="slot-grid"></div>
+    </div>
+
+    <div id="legend">
+      <span>Group availability:</span>
+      <div class="legend-box" style="background:#ffffff;"></div><span>0 available</span>
+      <div class="legend-box" style="background:rgba(46,125,50,0.25);"></div><span>~half</span>
+      <div class="legend-box" style="background:rgba(46,125,50,0.8);"></div><span>all available</span>
+      <span style="margin-left:10px;">Your slots are outlined in black.</span>
+    </div>
+
+    <div id="message" class="small-text" style="margin-top:8px;color:#c0392b;"></div>
+  </section>
+</main>
+
+<script>
+(function() {
+  const ADMIN_NAME = 'gam_evo';
+
+  function isAdminUser(name) {
+    return name === ADMIN_NAME;
+  }
+
+  function todayISO() {
+    const d = new Date();
+    return d.toISOString().slice(0, 10);
+  }
+
+  function addDays(iso, n) {
+    const d = new Date(iso + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+
+  // --- NEW: load/save from/to server instead of localStorage ---
+
+  async function loadState() {
+    try {
+      const res = await fetch('/api/state');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const obj = await res.json();
+      if (!obj.events) obj.events = {};
+      if (!('activeEventId' in obj)) obj.activeEventId = null;
+      return obj;
+    } catch (e) {
+      console.error('state load failed', e);
+      // fall back to empty state
+      return { events: {}, activeEventId: null };
+    }
+  }
+
+  function saveState() {
+    // fire-and-forget POST; we don't strictly need to await it
+    fetch('/api/state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(appState)
+    }).catch(err => {
+      console.error('state save failed', err);
+    });
+  }
+
+  // Start with empty; we'll replace this after sign-in by calling loadState()
+  let appState = { events: {}, activeEventId: null };
+  let currentUser = null;
+  let currentEventId = null;
+
+
+  // DOM refs
+  const signinSection = document.getElementById('signin-section');
+  const adminSection = document.getElementById('admin-section');
+  const participantSection = document.getElementById('participant-section');
+  const currentUserLabel = document.getElementById('current-user-label');
+
+  const nameInput = document.getElementById('name-input');
+  const signinBtn = document.getElementById('signin-button');
+  const signinError = document.getElementById('signin-error');
+
+  const eventNameInput = document.getElementById('event-name-input');
+  const dateRangeStartInput = document.getElementById('date-range-start');
+  const dateRangeDaysInput = document.getElementById('date-range-days');
+  const adminDateGrid = document.getElementById('admin-date-grid');
+  const adminTimeStrip = document.getElementById('admin-time-strip');
+  const timeStartInput = document.getElementById('time-start-input');
+  const timeEndInput = document.getElementById('time-end-input');
+  const saveEventButton = document.getElementById('save-event-button');
+  const resetAvailabilityButton = document.getElementById('reset-availability-button');
+  const adminParticipantList = document.getElementById('admin-participant-list');
+  const adminMessage = document.getElementById('admin-message');
+
+  const eventTitle = document.getElementById('event-title');
+  const dateHeaderRow = document.getElementById('date-header-row');
+  const gridContainer = document.getElementById('grid-container');
+  const timeLabelColumn = document.getElementById('time-label-column');
+  const slotGrid = document.getElementById('slot-grid');
+  const message = document.getElementById('message');
+
+  // Admin working data
+  let adminDateOptions = [];
+  let adminSelectedDates = new Set();
+  let adminSelectedMinutes = new Set();
+
+  // Participant grid
+  let timeSlots = [];
+  let timeSlotsMinutes = [];
+  let columnConfig = []; // [{type:'date', date}, {type:'timeIndex'}...]
+
+  // Helpers
+  function parseTimeToMinutes(t) {
+    const [hh, mm] = t.split(':').map(Number);
+    return hh*60 + mm;
+  }
+  function minutesToTimeValue(m) {
+    const hh = String(Math.floor(m/60)).padStart(2,'0');
+    const mm = String(m%60).padStart(2,'0');
+    return `${hh}:${mm}`;
+  }
+  function minutesToLabel(m) {
+    const h = Math.floor(m/60);
+    const mins = m%60;
+    const suffix = h>=12 ? 'PM':'AM';
+    const display = ((h+11)%12)+1;
+    return `${display}:${String(mins).padStart(2,'0')} ${suffix}`;
+  }
+  function formatDateDisplay(iso) {
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
+  }
+  function weekday(iso) {
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString(undefined, { weekday:'short' });
+  }
+
+  function getActiveEvent() {
+    if (!currentEventId) return null;
+    const ev = appState.events[currentEventId] || null;
+    if (!ev) return null;
+    if (ev.participants && ev.participants[ADMIN_NAME]) {
+      delete ev.participants[ADMIN_NAME];
+      saveState();
+    }
+    return ev;
+  }
+
+  function ensureParticipant(event, name) {
+    if (!event.participants) event.participants = {};
+    if (isAdminUser(name)) return null;
+    if (!event.participants[name]) {
+      event.participants[name] = { hours:{} };
+    }
+    return event.participants[name];
+  }
+
+   // SIGN-IN HANDLER (button + Enter key)
+  async function handleSignIn() {
+    const name = nameInput.value.trim();
+    signinError.textContent = '';
+
+    if (!name) {
+      signinError.textContent = 'Please enter a name.';
+      return;
+    }
+
+    currentUser = name;
+
+    // Load the latest global state from the server before deciding what to show
+    appState = await loadState();
+
+    if (isAdminUser(currentUser)) {
+      currentUserLabel.textContent = 'Admin: ' + ADMIN_NAME;
+      showAdminView();
+    } else {
+      const activeId = appState.activeEventId;
+      if (!activeId || !appState.events[activeId]) {
+        signinError.textContent = 'No event created yet. Ask gam_evo to make one.';
+        currentUser = null;
+        return;
+      }
+      currentEventId = activeId;
+      const ev = getActiveEvent();
+      ensureParticipant(ev, currentUser);
+      saveState(); // writes updated participants list to server
+      currentUserLabel.textContent = 'Signed in as: ' + currentUser;
+      showParticipantView();
+    }
+    signinSection.classList.add('hidden');
+  }
+
+
+  signinBtn.addEventListener('click', handleSignIn);
+  nameInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSignIn();
+    }
+  });
+
+  // -------- ADMIN VIEW --------
+  function initAdminDateControls() {
+    const today = todayISO();
+    dateRangeStartInput.min = today;
+    if (!dateRangeStartInput.value) {
+      dateRangeStartInput.value = today;
+    }
+  }
+
+  function buildAdminDateOptions() {
+    const start = dateRangeStartInput.value || todayISO();
+    const count = Math.max(1, Math.min(120, parseInt(dateRangeDaysInput.value||'30',10)));
+    dateRangeDaysInput.value = count;
+    adminDateOptions = [];
+    for (let i=0;i<count;i++) adminDateOptions.push(addDays(start, i));
+    adminSelectedDates = new Set(
+      [...adminSelectedDates].filter(d => adminDateOptions.includes(d))
+    );
+  }
+
+  function renderAdminDateGrid() {
+    adminDateGrid.innerHTML = '';
+    adminDateOptions.forEach(iso => {
+      const cell = document.createElement('div');
+      cell.className = 'admin-date-cell';
+      if (adminSelectedDates.has(iso)) cell.classList.add('selected');
+      cell.dataset.date = iso;
+
+      const dSpan = document.createElement('span');
+      dSpan.className = 'day-name';
+      dSpan.textContent = weekday(iso);
+      const dateSpan = document.createElement('span');
+      dateSpan.textContent = formatDateDisplay(iso);
+      cell.appendChild(dSpan);
+      cell.appendChild(dateSpan);
+
+      adminDateGrid.appendChild(cell);
+    });
+  }
+
+  // drag date paint
+  let dateDragActive = false;
+  let dateDragMode = 'add';
+  adminDateGrid.addEventListener('mousedown', e => {
+    const cell = e.target.closest('.admin-date-cell');
+    if (!cell) return;
+    e.preventDefault();
+    const iso = cell.dataset.date;
+    const selected = adminSelectedDates.has(iso);
+    dateDragMode = selected ? 'remove' : 'add';
+    dateDragActive = true;
+    applyDateDrag(cell);
+  });
+  adminDateGrid.addEventListener('mouseover', e => {
+    if (!dateDragActive) return;
+    const cell = e.target.closest('.admin-date-cell');
+    if (!cell) return;
+    applyDateDrag(cell);
+  });
+  window.addEventListener('mouseup', () => { dateDragActive=false; });
+
+  function applyDateDrag(cell) {
+    const iso = cell.dataset.date;
+    if (dateDragMode==='add') {
+      adminSelectedDates.add(iso);
+      cell.classList.add('selected');
+    } else {
+      adminSelectedDates.delete(iso);
+      cell.classList.remove('selected');
+    }
+  }
+
+  // Admin time strip
+  function initAdminTimeStrip() {
+    adminTimeStrip.innerHTML = '';
+    adminSelectedMinutes.clear();
+    for (let m=0;m<24*60;m+=15) {
+      const div = document.createElement('div');
+      div.className = 'time-slot-admin';
+      div.dataset.minutes = m;
+      adminTimeStrip.appendChild(div);
+    }
+  }
+
+  function syncTimeStripWithInputs() {
+    const startM = parseTimeToMinutes(timeStartInput.value || '09:00');
+    const endM   = parseTimeToMinutes(timeEndInput.value   || '17:00');
+    adminSelectedMinutes.clear();
+    adminTimeStrip.querySelectorAll('.time-slot-admin').forEach(el => {
+      const m = parseInt(el.dataset.minutes,10);
+      const selected = (m>=startM && m<=endM);
+      el.classList.toggle('selected', selected);
+      if (selected) adminSelectedMinutes.add(m);
+    });
+  }
+
+  let timeDragActive = false;
+  let timeDragMode = 'add';
+  adminTimeStrip.addEventListener('mousedown', e => {
+    const cell = e.target.closest('.time-slot-admin');
+    if (!cell) return;
+    e.preventDefault();
+    const m = parseInt(cell.dataset.minutes,10);
+    const selected = adminSelectedMinutes.has(m);
+    timeDragMode = selected ? 'remove' : 'add';
+    timeDragActive = true;
+    applyTimeDrag(cell);
+    updateInputsFromSelectedMinutes();
+  });
+  adminTimeStrip.addEventListener('mouseover', e => {
+    if (!timeDragActive) return;
+    const cell = e.target.closest('.time-slot-admin');
+    if (!cell) return;
+    applyTimeDrag(cell);
+    updateInputsFromSelectedMinutes();
+  });
+  window.addEventListener('mouseup', () => { timeDragActive=false; });
+
+  function applyTimeDrag(cell) {
+    const m = parseInt(cell.dataset.minutes,10);
+    if (timeDragMode==='add') {
+      adminSelectedMinutes.add(m);
+      cell.classList.add('selected');
+    } else {
+      adminSelectedMinutes.delete(m);
+      cell.classList.remove('selected');
+    }
+  }
+
+  function updateInputsFromSelectedMinutes() {
+    if (!adminSelectedMinutes.size) {
+      timeStartInput.value='09:00';
+      timeEndInput.value='17:00';
+      return;
+    }
+    const mins = Array.from(adminSelectedMinutes).sort((a,b)=>a-b);
+    const startM = mins[0];
+    const endM   = mins[mins.length-1];
+    timeStartInput.value = minutesToTimeValue(startM);
+    timeEndInput.value   = minutesToTimeValue(endM);
+  }
+
+  timeStartInput.addEventListener('change', syncTimeStripWithInputs);
+  timeEndInput.addEventListener('change', syncTimeStripWithInputs);
+
+  dateRangeStartInput.addEventListener('change', () => {
+    if (dateRangeStartInput.value < todayISO()) {
+      dateRangeStartInput.value = todayISO();
+    }
+    buildAdminDateOptions();
+    renderAdminDateGrid();
+  });
+  dateRangeDaysInput.addEventListener('change', () => {
+    buildAdminDateOptions();
+    renderAdminDateGrid();
+  });
+
+  function renderAdminParticipantList() {
+    const ev = getActiveEvent();
+    adminParticipantList.innerHTML = '';
+    if (!ev || !ev.participants || !Object.keys(ev.participants).length) {
+      const li = document.createElement('li');
+      li.textContent = '(No participants yet)';
+      adminParticipantList.appendChild(li);
+      return;
+    }
+    Object.keys(ev.participants)
+      .filter(name => name !== ADMIN_NAME)
+      .sort()
+      .forEach(name => {
+        const li = document.createElement('li');
+        const span = document.createElement('span');
+        span.textContent = name;
+        const btn = document.createElement('button');
+        btn.textContent = 'Remove';
+        btn.addEventListener('click', () => {
+          delete ev.participants[name];
+          saveState();
+          renderAdminParticipantList();
+          adminMessage.textContent = `Removed participant: ${name}`;
+        });
+        li.appendChild(span);
+        li.appendChild(btn);
+        adminParticipantList.appendChild(li);
+      });
+  }
+
+  function showAdminView() {
+    adminSection.classList.remove('hidden');
+    participantSection.classList.add('hidden');
+    adminMessage.textContent = '';
+
+    initAdminDateControls();
+    const active = appState.activeEventId && appState.events[appState.activeEventId];
+
+    if (active) {
+      currentEventId = active.id;
+      eventNameInput.value = active.name || '';
+      dateRangeStartInput.value = active.dates[0] || todayISO();
+      buildAdminDateOptions();
+      adminSelectedDates = new Set(active.dates || []);
+    } else {
+      eventNameInput.value = '';
+      currentEventId = null;
+      buildAdminDateOptions();
+      adminSelectedDates.clear();
+    }
+    renderAdminDateGrid();
+
+    initAdminTimeStrip();
+
+    if (active) {
+      timeStartInput.value = active.timeStart || '09:00';
+      timeEndInput.value   = active.timeEnd || '17:00';
+    } else {
+      timeStartInput.value='09:00';
+      timeEndInput.value='17:00';
+    }
+    syncTimeStripWithInputs();
+    renderAdminParticipantList();
+  }
+
+  saveEventButton.addEventListener('click', () => {
+    if (!adminSelectedDates.size) {
+      adminMessage.textContent = 'Please select at least one date.';
+      return;
+    }
+    if (!adminSelectedMinutes.size) {
+      adminMessage.textContent = 'Please select at least one time slot.';
+      return;
+    }
+    const mins = Array.from(adminSelectedMinutes).sort((a,b)=>a-b);
+    const startM = mins[0];
+    const endM   = mins[mins.length-1];
+    if (endM < startM) {
+      adminMessage.textContent = 'End time must be after start time.';
+      return;
+    }
+
+    const name = eventNameInput.value.trim() || 'Untitled Event';
+    const dates = Array.from(adminSelectedDates).sort();
+
+    let eventId = appState.activeEventId;
+    if (!eventId || !appState.events[eventId]) {
+      eventId = 'event-'+Date.now();
+      appState.events[eventId] = {
+        id:eventId,
+        name,
+        createdAt:new Date().toISOString(),
+        dates:[],
+        timeStart:'09:00',
+        timeEnd:'17:00',
+        participants:{}
+      };
+    }
+    const ev = appState.events[eventId];
+    ev.name = name;
+    ev.dates = dates;
+    ev.timeStart = minutesToTimeValue(startM);
+    ev.timeEnd   = minutesToTimeValue(endM);
+    if (!ev.participants) ev.participants = {};
+    if (ev.participants[ADMIN_NAME]) delete ev.participants[ADMIN_NAME];
+
+    // Trim participant hours to existing dates
+    const dateSet = new Set(dates);
+    for (const nm in ev.participants) {
+      const p = ev.participants[nm];
+      if (!p.hours) continue;
+      for (const d in p.hours) {
+        if (!dateSet.has(d)) delete p.hours[d];
+      }
+    }
+
+    appState.activeEventId = eventId;
+    currentEventId = eventId;
+    saveState();
+
+    adminMessage.textContent = 'Event saved. Participants now see updated dates & times.';
+    renderAdminParticipantList();
+  });
+
+  resetAvailabilityButton.addEventListener('click', () => {
+    const ev = getActiveEvent();
+    if (!ev) return;
+    if (!confirm('Reset all participants’ availability for this event?')) return;
+    for (const nm in ev.participants) {
+      if (nm === ADMIN_NAME) continue;
+      ev.participants[nm].hours = {};
+    }
+    saveState();
+    adminMessage.textContent = 'All availability has been cleared.';
+    renderAdminParticipantList();
+  });
+
+  // -------- PARTICIPANT GRID --------
+  function setupTimeSlotsFromEvent(ev) {
+    timeSlots = [];
+    timeSlotsMinutes = [];
+    const startM = parseTimeToMinutes(ev.timeStart);
+    const endM   = parseTimeToMinutes(ev.timeEnd);
+    for (let m=startM; m<=endM; m+=15) {
+      timeSlotsMinutes.push(m);
+      timeSlots.push(minutesToLabel(m));   // label every 15 minutes
+    }
+  }
+
+  function buildColumnConfig(ev) {
+    columnConfig = [];
+    ev.dates.forEach((iso, idx) => {
+      columnConfig.push({type:'date', date: iso});
+      // every 15 days, insert a vertical time index column (except after last)
+      if ((idx + 1) % 15 === 0 && idx !== ev.dates.length - 1) {
+        columnConfig.push({type:'timeIndex'});
+      }
+    });
+  }
+
+  function renderGridStructure() {
+    const ev = getActiveEvent();
+    if (!ev) return;
+    setupTimeSlotsFromEvent(ev);
+    buildColumnConfig(ev);
+
+    // Header
+    dateHeaderRow.innerHTML = '';
+    columnConfig.forEach(col => {
+      if (col.type === 'date') {
+        const dh = document.createElement('div');
+        dh.className = 'date-header';
+        const main = document.createElement('span');
+        main.className = 'date-main';
+        main.textContent = weekday(col.date);
+        const sub = document.createElement('span');
+        sub.className = 'date-sub';
+        sub.textContent = formatDateDisplay(col.date);
+        dh.appendChild(main);
+        dh.appendChild(sub);
+        dateHeaderRow.appendChild(dh);
+      } else {
+        const th = document.createElement('div');
+        th.className = 'time-index-header';
+        th.textContent = 'Time';
+        dateHeaderRow.appendChild(th);
+      }
+    });
+    dateHeaderRow.style.transform = 'translateX(0px)';
+
+    // Left time labels
+    timeLabelColumn.innerHTML = '';
+    timeSlots.forEach(label => {
+      const tl = document.createElement('div');
+      tl.className = 'time-label';
+      tl.textContent = label;
+      timeLabelColumn.appendChild(tl);
+    });
+
+    // Grid rows
+    slotGrid.innerHTML = '';
+    timeSlots.forEach(label => {
+      const row = document.createElement('div');
+      row.className = 'slot-row';
+      columnConfig.forEach(col => {
+        if (col.type === 'date') {
+          const cell = document.createElement('div');
+          cell.className = 'slot-cell';
+          cell.dataset.date = col.date;
+          cell.dataset.time = label;
+          row.appendChild(cell);
+        } else {
+          const tc = document.createElement('div');
+          tc.className = 'time-index-cell';
+          tc.textContent = label;   // vertical time label column
+          row.appendChild(tc);
+        }
+      });
+      slotGrid.appendChild(row);
+    });
+
+    attachSlotDragHandlers();
+    refreshAllCells();
+  }
+
+  // NEW: availability with available + unavailable lists
+  function getSlotAvailability(iso, label) {
+    const ev = getActiveEvent();
+    const participants = ev.participants || {};
+    const availableNames = [];
+    const unavailableNames = [];
+    let total = 0;
+
+    for (const nm in participants) {
+      if (nm === ADMIN_NAME) continue;
+      total++;
+      const p = participants[nm];
+      const arr = (p.hours && p.hours[iso]) ? p.hours[iso] : [];
+      if (arr.includes(label)) {
+        availableNames.push(nm);
+      } else {
+        unavailableNames.push(nm);
+      }
+    }
+
+    return {
+      total,
+      availableCount: availableNames.length,
+      availableNames,
+      unavailableNames
+    };
+  }
+
+  function refreshAllCells() {
+    const ev = getActiveEvent();
+    if (!ev) return;
+    const you = ensureParticipant(ev, currentUser);
+    const rows = slotGrid.querySelectorAll('.slot-row');
+    rows.forEach(row => {
+      row.querySelectorAll('.slot-cell').forEach(cell => {
+        const iso = cell.dataset.date;
+        const label = cell.dataset.time;
+        const yourArr = you && you.hours[iso] ? you.hours[iso] : [];
+        const youHere = yourArr.includes(label);
+        const info = getSlotAvailability(iso, label);
+        paintCell(cell, info, youHere);
+      });
+    });
+  }
+
+  function paintCell(cell, info, youHere) {
+    const {total, availableCount, availableNames, unavailableNames} = info;
+    let bg = '#ffffff';
+    if (total>0 && availableCount>0) {
+      const frac = availableCount/Math.max(1,total);
+      const alpha = 0.15 + 0.65*frac;
+      bg = `rgba(46,125,50,${alpha.toFixed(3)})`;
+    }
+    cell.style.background = bg;
+    cell.classList.toggle('you-selected', youHere);
+
+    const unavailableCount = total - availableCount;
+    const titleLines = [];
+    titleLines.push(`${availableCount}/${total} available`);
+    if (availableNames.length) titleLines.push(availableNames.join(', '));
+    titleLines.push(`${unavailableCount}/${total} unavailable`);
+    if (unavailableNames.length) titleLines.push(unavailableNames.join(', '));
+    cell.title = titleLines.join('\n');
+  }
+
+  function toggleSlotForUser(iso, label, mode) {
+    const ev = getActiveEvent();
+    const you = ensureParticipant(ev, currentUser);
+    if (!you) return;
+    if (!you.hours[iso]) you.hours[iso] = [];
+    const arr = you.hours[iso];
+    const idx = arr.indexOf(label);
+    if (mode==='add') {
+      if (idx===-1) arr.push(label);
+    } else if (mode==='remove') {
+      if (idx!==-1) arr.splice(idx,1);
+    } else {
+      if (idx===-1) arr.push(label);
+      else arr.splice(idx,1);
+    }
+    arr.sort((a,b)=> timeSlots.indexOf(a)-timeSlots.indexOf(b));
+    saveState();
+  }
+
+  let slotDragActive = false;
+  let slotDragMode = 'add';
+
+  function attachSlotDragHandlers() {
+    slotGrid.onmousedown = slotMouseDown;
+    slotGrid.onmouseover = slotMouseOver;
+    window.addEventListener('mouseup', () => { slotDragActive=false; });
+  }
+
+  function slotMouseDown(e) {
+    const cell = e.target.closest('.slot-cell');
+    if (!cell) return;
+    e.preventDefault();
+    const iso = cell.dataset.date;
+    const label = cell.dataset.time;
+    const ev = getActiveEvent();
+    const you = ensureParticipant(ev, currentUser);
+    const arr = you && you.hours[iso] ? you.hours[iso] : [];
+    const selected = arr.includes(label);
+    slotDragMode = selected ? 'remove' : 'add';
+    slotDragActive = true;
+    applySlotDrag(cell);
+  }
+
+  function slotMouseOver(e) {
+    if (!slotDragActive) return;
+    const cell = e.target.closest('.slot-cell');
+    if (!cell) return;
+    applySlotDrag(cell);
+  }
+
+  function applySlotDrag(cell) {
+    const iso = cell.dataset.date;
+    const label = cell.dataset.time;
+    toggleSlotForUser(iso,label,slotDragMode);
+    const info = getSlotAvailability(iso, label);
+    const ev = getActiveEvent();
+    const you = ensureParticipant(ev, currentUser);
+    const arr = you && you.hours[iso] ? you.hours[iso] : [];
+    const youHere = arr.includes(label);
+    paintCell(cell, info, youHere);
+  }
+
+  function showParticipantView() {
+    adminSection.classList.add('hidden');
+    participantSection.classList.remove('hidden');
+    const ev = getActiveEvent();
+    if (!ev) {
+      message.textContent = 'No event found. Ask gam_evo to create one.';
+      return;
+    }
+    eventTitle.textContent = ev.name || 'Event';
+    message.textContent = '';
+    renderGridStructure();
+  }
+
+  // single horizontal scrollbar: sync header with grid scroll
+  gridContainer.addEventListener('scroll', () => {
+    dateHeaderRow.style.transform = 'translateX(' + (-gridContainer.scrollLeft) + 'px)';
+  });
+
+  // init admin controls
+  initAdminDateControls();
+})();
+</script>
+</body>
+</html>
