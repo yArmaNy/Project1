@@ -257,6 +257,17 @@
       border:1px solid #ccc;
       margin-right:4px;
     }
+        /* Info panel for the currently selected slot */
+    #slot-info-panel {
+      margin-top:8px;
+      padding:8px;
+      border-radius:4px;
+      border:1px solid #ddd;
+      background:#fafafa;
+      max-height:120px;
+      overflow:auto;
+    }
+
 
     /* Admin participant list */
     #admin-participant-list {
@@ -412,7 +423,7 @@
     <h2 id="event-title"></h2>
     <div class="small-text">
       Drag over the grid to mark when you’re available.
-      Colour shows how many people are available; hover a cell to see names.
+      Colour shows how many people are available; hover or tap a cell to see names.
     </div>
 
     <div id="grid-header">
@@ -425,15 +436,19 @@
       <div id="slot-grid"></div>
     </div>
 
-    <div id="legend">
-      <span>Group availability:</span>
-      <div class="legend-box" style="background:#ffffff;"></div><span>0 available</span>
-      <div class="legend-box" style="background:rgba(46,125,50,0.25);"></div><span>~half</span>
-      <div class="legend-box" style="background:rgba(46,125,50,0.8);"></div><span>all available</span>
-      <span style="margin-left:10px;">Your slots are outlined in black.</span>
-    </div>
+      <div id="legend">
+        <span>Group availability:</span>
+        <div class="legend-box" style="background:#ffffff;"></div><span>0 available</span>
+        <div class="legend-box" style="background:rgba(46,125,50,0.25);"></div><span>~half</span>
+        <div class="legend-box" style="background:rgba(46,125,50,0.8);"></div><span>all available</span>
+        <span style="margin-left:10px;">Your slots are outlined in black.</span>
+      </div>
 
-    <div id="message" class="small-text" style="margin-top:8px;color:#c0392b;"></div>
+      <!-- Shows names for the currently selected/tapped slot (especially useful on mobile) -->
+      <div id="slot-info-panel" class="small-text hidden" aria-live="polite"></div>
+
+      <div id="message" class="small-text" style="margin-top:8px;color:#c0392b;"></div>
+
   </section>
 </main>
 
@@ -512,6 +527,8 @@
   const timeLabelColumn = document.getElementById('time-label-column');
   const slotGrid = document.getElementById('slot-grid');
   const message = document.getElementById('message');
+  const slotInfoPanel = document.getElementById('slot-info-panel');
+
 
   // Admin working data
   let adminDateOptions = [];
@@ -547,6 +564,13 @@
   function weekday(iso) {
     const d = new Date(iso + 'T00:00:00');
     return d.toLocaleDateString(undefined, { weekday:'short' });
+  }
+    // Helper to map touch positions to the right element on mobile
+  function getTouchTarget(e, selector) {
+    const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]);
+    if (!t) return null;
+    const el = document.elementFromPoint(t.clientX, t.clientY);
+    return el && el.closest(selector);
   }
 
   function getActiveEvent() {
@@ -689,6 +713,28 @@
     applyDateDrag(cell);
   });
   window.addEventListener('mouseup', () => { dateDragActive=false; });
+    // touch drag for admin date grid (mobile)
+  adminDateGrid.addEventListener('touchstart', e => {
+    const cell = getTouchTarget(e, '.admin-date-cell');
+    if (!cell) return;
+    e.preventDefault();
+    const iso = cell.dataset.date;
+    const selected = adminSelectedDates.has(iso);
+    dateDragMode = selected ? 'remove' : 'add';
+    dateDragActive = true;
+    applyDateDrag(cell);
+  }, { passive: false });
+
+  adminDateGrid.addEventListener('touchmove', e => {
+    if (!dateDragActive) return;
+    const cell = getTouchTarget(e, '.admin-date-cell');
+    if (!cell) return;
+    e.preventDefault();
+    applyDateDrag(cell);
+  }, { passive: false });
+
+  window.addEventListener('touchend', () => { dateDragActive=false; });
+  window.addEventListener('touchcancel', () => { dateDragActive=false; });
 
   function applyDateDrag(cell) {
     const iso = cell.dataset.date;
@@ -746,6 +792,30 @@
     updateInputsFromSelectedMinutes();
   });
   window.addEventListener('mouseup', () => { timeDragActive=false; });
+    // touch drag for admin time strip (mobile)
+  adminTimeStrip.addEventListener('touchstart', e => {
+    const cell = getTouchTarget(e, '.time-slot-admin');
+    if (!cell) return;
+    e.preventDefault();
+    const m = parseInt(cell.dataset.minutes,10);
+    const selected = adminSelectedMinutes.has(m);
+    timeDragMode = selected ? 'remove' : 'add';
+    timeDragActive = true;
+    applyTimeDrag(cell);
+    updateInputsFromSelectedMinutes();
+  }, { passive: false });
+
+  adminTimeStrip.addEventListener('touchmove', e => {
+    if (!timeDragActive) return;
+    const cell = getTouchTarget(e, '.time-slot-admin');
+    if (!cell) return;
+    e.preventDefault();
+    applyTimeDrag(cell);
+    updateInputsFromSelectedMinutes();
+  }, { passive: false });
+
+  window.addEventListener('touchend', () => { timeDragActive=false; });
+  window.addEventListener('touchcancel', () => { timeDragActive=false; });
 
   function applyTimeDrag(cell) {
     const m = parseInt(cell.dataset.minutes,10);
@@ -1071,6 +1141,24 @@
     if (unavailableNames.length) titleLines.push(unavailableNames.join(', '));
     cell.title = titleLines.join('\n');
   }
+    // Show detailed availability for a slot in the info panel (good for mobile)
+  function showSlotInfo(iso, label) {
+    if (!slotInfoPanel) return;
+    const ev = getActiveEvent();
+    if (!ev) return;
+    const info = getSlotAvailability(iso, label);
+    if (!info) return;
+
+    const { total, availableCount, availableNames, unavailableNames } = info;
+    const dateText = formatDateDisplay(iso) + ' (' + weekday(iso) + ')';
+
+    slotInfoPanel.classList.remove('hidden');
+    slotInfoPanel.innerHTML =
+      `<strong>${dateText}, ${label}</strong><br>` +
+      `${availableCount}/${total} available<br>` +
+      `<strong>Available:</strong> ${availableNames.length ? availableNames.join(', ') : 'none'}<br>` +
+      `<strong>Unavailable:</strong> ${unavailableNames.length ? unavailableNames.join(', ') : 'none'}`;
+  }
 
   function toggleSlotForUser(iso, label, mode) {
     const ev = getActiveEvent();
@@ -1095,9 +1183,16 @@
   let slotDragMode = 'add';
 
   function attachSlotDragHandlers() {
+    // Mouse drag (desktop)
     slotGrid.onmousedown = slotMouseDown;
     slotGrid.onmouseover = slotMouseOver;
     window.addEventListener('mouseup', () => { slotDragActive=false; });
+
+    // Touch drag (mobile)
+    slotGrid.addEventListener('touchstart', slotTouchStart, { passive:false });
+    slotGrid.addEventListener('touchmove', slotTouchMove, { passive:false });
+    window.addEventListener('touchend', () => { slotDragActive=false; });
+    window.addEventListener('touchcancel', () => { slotDragActive=false; });
   }
 
   function slotMouseDown(e) {
@@ -1122,6 +1217,30 @@
     applySlotDrag(cell);
   }
 
+  // Touch versions for mobile
+  function slotTouchStart(e) {
+    const cell = getTouchTarget(e, '.slot-cell');
+    if (!cell) return;
+    e.preventDefault();
+    const iso = cell.dataset.date;
+    const label = cell.dataset.time;
+    const ev = getActiveEvent();
+    const you = ensureParticipant(ev, currentUser);
+    const arr = you && you.hours[iso] ? you.hours[iso] : [];
+    const selected = arr.includes(label);
+    slotDragMode = selected ? 'remove' : 'add';
+    slotDragActive = true;
+    applySlotDrag(cell);
+  }
+
+  function slotTouchMove(e) {
+    if (!slotDragActive) return;
+    const cell = getTouchTarget(e, '.slot-cell');
+    if (!cell) return;
+    e.preventDefault();
+    applySlotDrag(cell);
+  }
+
   function applySlotDrag(cell) {
     const iso = cell.dataset.date;
     const label = cell.dataset.time;
@@ -1132,6 +1251,9 @@
     const arr = you && you.hours[iso] ? you.hours[iso] : [];
     const youHere = arr.includes(label);
     paintCell(cell, info, youHere);
+
+    // Also update the info panel so users can see who is available (mobile-friendly)
+    showSlotInfo(iso, label);
   }
 
   function showParticipantView() {
