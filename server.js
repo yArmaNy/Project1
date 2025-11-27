@@ -1,3 +1,4 @@
+// oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 // server.js
 const express = require('express');
 const fs = require('fs');
@@ -55,5 +56,5 @@ app.post('/api/state', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
+  console.log(`Server listening on port ${PORT}`);
 });
