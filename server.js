@@ -14,7 +14,7 @@ const ADMIN_NAME = process.env.ADMIN_NAME || 'gam_evo';
 app.use(express.json());
 
 // Serve your static files (index.html, CSS, JS) from ./Public
-app.use(express.static(path.join(__dirname, '/')));
+app.use(express.static(path.join(__dirname, 'Public')));
 
 // Helper to load state from disk
 function readState() {
